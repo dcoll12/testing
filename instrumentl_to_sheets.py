@@ -33,8 +33,8 @@ SPREADSHEET_URL = (
 )
 INSTRUMENTL_URL = "https://www.instrumentl.com/projects#/all-projects"
 
-SHEET_START_ROW = 2    # first row to write URLs into (1-indexed)
-SHEET_COLUMN    = "B"  # column to paste URLs
+SHEET_START_ROW = 2    # first row to write into (1-indexed)
+SHEET_COLUMN    = "A"  # starting column (name goes here, URL goes in the next column)
 
 # ── Resume support ─────────────────────────────────────────────────────────
 # Set SKIP_FIRST_N > 0 to fast-scroll past grants already in the sheet.
@@ -118,11 +118,18 @@ def sheets_go_to_start(driver, cell_address: str):
     time.sleep(0.8)
 
 
-def sheets_type_url(driver, url: str):
-    """Type a URL into the active Sheets cell, then press Enter to move down."""
+def sheets_write_row(driver, name: str, url: str):
+    """
+    Write grant name to the current cell (col A) and URL to the next cell (col B),
+    then press Enter to move down to the next row.
+    Assumes the cursor is already on column A of the target row.
+    """
+    active = driver.switch_to.active_element
+    active.send_keys(name)
+    active.send_keys(Keys.TAB)      # move right to col B
     active = driver.switch_to.active_element
     active.send_keys(url)
-    active.send_keys(Keys.RETURN)   # confirm + advance to next row
+    active.send_keys(Keys.RETURN)   # confirm + move down (returns to col A)
     time.sleep(0.5)
 
 
@@ -246,6 +253,39 @@ def open_grant_and_get_url(driver, grant_row) -> str | None:
         return None
 
 
+def save_grant(driver):
+    """
+    Click the Save button on the open grant modal.
+    Uses the same selector priority as the original bookmarklet:
+      1. .save-button-container > .btn  (most specific)
+      2. Any visible button whose text is exactly "save"
+      3. [aria-label="Save"]
+    Logs a warning but does NOT raise if the button isn't found.
+    """
+    # Try the specific container selector first
+    for by, sel in [
+        (By.CSS_SELECTOR, ".save-button-container > .btn"),
+        (By.CSS_SELECTOR, "[aria-label='Save'], [aria-label='save']"),
+        (By.XPATH, "//button[normalize-space(translate(text(),'SAVE','save'))='save']"),
+    ]:
+        try:
+            btn = wait_for(driver, timeout=5).until(
+                EC.element_to_be_clickable((by, sel))
+            )
+            driver.execute_script(
+                "arguments[0].scrollIntoView({behavior:'smooth',block:'center'});", btn
+            )
+            time.sleep(0.4)
+            btn.click()
+            time.sleep(1.0)   # brief pause after saving
+            print("  ✓ Grant saved.")
+            return
+        except TimeoutException:
+            continue
+
+    print("  ⚠ Save button not found — grant not saved.")
+
+
 def close_grant_modal(driver):
     """Close the grant detail modal."""
     try:
@@ -363,11 +403,14 @@ def main():
         scroll_element_into_view(driver, next_row)
         website_url = open_grant_and_get_url(driver, next_row)
 
+        # Save the grant on Instrumentl (mirrors the bookmarklet behaviour)
+        save_grant(driver)
+
         if website_url:
             print(f"  URL: {website_url}  → row {sheet_row}")
             driver.switch_to.window(sheets_handle)
             time.sleep(1)
-            sheets_type_url(driver, website_url)   # Enter advances the row
+            sheets_write_row(driver, next_row_text, website_url)
             driver.switch_to.window(instrumentl_handle)
             time.sleep(1)
 
