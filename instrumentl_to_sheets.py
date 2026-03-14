@@ -127,23 +127,53 @@ def sheets_type_url(driver, url: str):
 
 
 def instrumentl_sort_by_grant_name(driver):
-    """Click the sort trigger and choose 'Grant Name'."""
+    """
+    Click the sort dropdown and choose 'Grant Name'.
+    The hashed Ember class (._trigger_XXXXX) changes between deployments,
+    so we try multiple stable selectors and skip gracefully if none work.
+    """
     wait = wait_for(driver)
-    trigger = wait.until(
-        EC.element_to_be_clickable(
-            (By.CSS_SELECTOR, "._trigger_163dkf > .table-sort-item-label")
-        )
-    )
+
+    # Try stable selectors for the sort trigger (most to least specific)
+    trigger = None
+    trigger_selectors = [
+        # The label span inside any trigger-like element
+        (By.CSS_SELECTOR, ".table-sort-item-label"),
+        # Buttons/divs that contain the sort label text
+        (By.XPATH, "//*[contains(@class,'table-sort-item-label')]"),
+        # Any element whose text looks like a sort control
+        (By.XPATH, "//span[normalize-space()='Grant Name' or normalize-space()='Date Added' or normalize-space()='Sort']"),
+        # Fallback: the old hashed class (works if Ember version hasn't changed)
+        (By.CSS_SELECTOR, "._trigger_163dkf > .table-sort-item-label"),
+    ]
+    for by, sel in trigger_selectors:
+        try:
+            trigger = wait_for(driver, timeout=5).until(
+                EC.element_to_be_clickable((by, sel))
+            )
+            break
+        except TimeoutException:
+            continue
+
+    if trigger is None:
+        print("  ⚠ Could not find sort trigger — skipping sort step.")
+        print("    Grants will be processed in default order.")
+        return
+
     trigger.click()
     time.sleep(0.5)
 
-    grant_name_opt = wait.until(
-        EC.element_to_be_clickable(
-            (By.XPATH, "//p[contains(.,'Grant Name')]")
+    try:
+        grant_name_opt = wait_for(driver, timeout=5).until(
+            EC.element_to_be_clickable(
+                (By.XPATH, "//*[contains(.,'Grant Name') and not(self::html) and not(self::body)]")
+            )
         )
-    )
-    grant_name_opt.click()
-    time.sleep(SHORT_WAIT)
+        grant_name_opt.click()
+        time.sleep(SHORT_WAIT)
+        print("  Sorted by Grant Name.")
+    except TimeoutException:
+        print("  ⚠ 'Grant Name' option not found after clicking trigger — skipping sort.")
 
 
 def get_grant_rows(driver):
