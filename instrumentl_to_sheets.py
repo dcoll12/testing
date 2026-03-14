@@ -15,7 +15,9 @@ where the cell address (e.g. "B46") was being typed as literal text
 instead of used for navigation.
 """
 
+import os
 import time
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -322,6 +324,37 @@ def close_grant_modal(driver):
         time.sleep(1)
 
 
+def instrumentl_login(driver):
+    """
+    Log in to Instrumentl using credentials from the .env file.
+    Expects INSTRUMENTL_EMAIL and INSTRUMENTL_PASSWORD to be set.
+    """
+    load_dotenv()
+    email    = os.environ["INSTRUMENTL_EMAIL"]
+    password = os.environ["INSTRUMENTL_PASSWORD"]
+
+    driver.get("https://www.instrumentl.com/login")
+    wait = WebDriverWait(driver, 15)
+
+    email_field = wait.until(EC.presence_of_element_located(
+        (By.CSS_SELECTOR, "input[type='email'], input[name='email'], input[id*='email']")
+    ))
+    email_field.clear()
+    email_field.send_keys(email)
+
+    password_field = driver.find_element(
+        By.CSS_SELECTOR, "input[type='password']"
+    )
+    password_field.clear()
+    password_field.send_keys(password)
+    password_field.send_keys(Keys.RETURN)
+
+    # Wait until we're redirected away from the login page
+    wait.until(EC.url_changes("https://www.instrumentl.com/login"))
+    print("  Logged in successfully.")
+    time.sleep(2)
+
+
 def main():
     driver = make_driver()
 
@@ -336,10 +369,12 @@ def main():
     print(f"Navigating to starting cell {start_cell} …")
     sheets_go_to_start(driver, start_cell)
 
-    # ── 2. Open Instrumentl in a new tab ────────────────────────────────────
+    # ── 2. Open Instrumentl in a new tab and log in ──────────────────────────
     print("Opening Instrumentl …")
     driver.execute_script("window.open('');")
     driver.switch_to.window(driver.window_handles[-1])
+    print("  Logging in …")
+    instrumentl_login(driver)
     driver.get(INSTRUMENTL_URL)
     instrumentl_handle = driver.current_window_handle
     time.sleep(SHORT_WAIT + 1)
