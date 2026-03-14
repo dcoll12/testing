@@ -326,12 +326,12 @@ def close_grant_modal(driver):
 
 def instrumentl_login(driver):
     """
-    Log in to Instrumentl using credentials from the .env file.
-    Expects INSTRUMENTL_EMAIL and INSTRUMENTL_PASSWORD to be set.
+    Log in to Instrumentl. Reads from .env if present, otherwise uses
+    the hardcoded fallback credentials.
     """
     load_dotenv()
-    email    = os.environ["INSTRUMENTL_EMAIL"]
-    password = os.environ["INSTRUMENTL_PASSWORD"]
+    email    = os.environ.get("INSTRUMENTL_EMAIL",    "darian@aracities.org")
+    password = os.environ.get("INSTRUMENTL_PASSWORD", "ZE,EP2MLv3r=kh]")
 
     driver.get("https://www.instrumentl.com/login")
     wait = WebDriverWait(driver, 15)
