@@ -33,8 +33,8 @@ SPREADSHEET_URL = (
 )
 INSTRUMENTL_URL = "https://www.instrumentl.com/projects#/all-projects"
 
-SHEET_START_ROW = 2    # first row to write URLs into (1-indexed)
-SHEET_COLUMN    = "B"  # column to paste URLs
+SHEET_START_ROW = 2    # first row to write into (1-indexed)
+SHEET_COLUMN    = "A"  # starting column (name goes here, URL goes in the next column)
 
 # ── Resume support ─────────────────────────────────────────────────────────
 # Set SKIP_FIRST_N > 0 to fast-scroll past grants already in the sheet.
@@ -118,11 +118,18 @@ def sheets_go_to_start(driver, cell_address: str):
     time.sleep(0.8)
 
 
-def sheets_type_url(driver, url: str):
-    """Type a URL into the active Sheets cell, then press Enter to move down."""
+def sheets_write_row(driver, name: str, url: str):
+    """
+    Write grant name to the current cell (col A) and URL to the next cell (col B),
+    then press Enter to move down to the next row.
+    Assumes the cursor is already on column A of the target row.
+    """
+    active = driver.switch_to.active_element
+    active.send_keys(name)
+    active.send_keys(Keys.TAB)      # move right to col B
     active = driver.switch_to.active_element
     active.send_keys(url)
-    active.send_keys(Keys.RETURN)   # confirm + advance to next row
+    active.send_keys(Keys.RETURN)   # confirm + move down (returns to col A)
     time.sleep(0.5)
 
 
@@ -403,7 +410,7 @@ def main():
             print(f"  URL: {website_url}  → row {sheet_row}")
             driver.switch_to.window(sheets_handle)
             time.sleep(1)
-            sheets_type_url(driver, website_url)   # Enter advances the row
+            sheets_write_row(driver, next_row_text, website_url)
             driver.switch_to.window(instrumentl_handle)
             time.sleep(1)
 
