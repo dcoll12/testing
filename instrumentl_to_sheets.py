@@ -28,6 +28,13 @@ INSTRUMENTL_URL = "https://www.instrumentl.com/projects#/all-projects"
 SHEET_START_ROW = 2   # first row to write URLs into (1-indexed)
 SHEET_COLUMN    = "B" # column to paste URLs
 
+# ── Resume support ────────────────────────────────────────────────────────────
+# Set SKIP_FIRST_N > 0 to fast-scroll past grants already in the sheet.
+# The script will mark the first N grants as "already processed" without
+# opening them, then start writing at SHEET_START_ROW + SKIP_FIRST_N.
+SKIP_FIRST_N = 50   # 50 grants already collected; resume from grant 51
+# ─────────────────────────────────────────────────────────────────────────────
+
 SHORT_WAIT  = 3   # seconds for short pauses
 LONG_WAIT   = 10  # seconds for WebDriverWait timeout
 # ─────────────────────────────────────────────────────────────────────────────
@@ -216,10 +223,42 @@ def main():
     print("Sorting by Grant Name …")
     instrumentl_sort_by_grant_name(driver)
 
-    # ── 4. Iterate over grants ───────────────────────────────────────────────
-    current_sheet_row = SHEET_START_ROW
+    # ── 4. Fast-skip already-processed grants ────────────────────────────────
+    processed_names   = set()
+    current_sheet_row = SHEET_START_ROW + SKIP_FIRST_N
+
+    if SKIP_FIRST_N > 0:
+        print(f"Skipping first {SKIP_FIRST_N} grants (already in sheet) …")
+        skipped = 0
+        skip_empty = 0
+        while skipped < SKIP_FIRST_N:
+            rows = get_grant_rows(driver)
+            new_in_batch = 0
+            for row in rows:
+                text = row.text.strip().splitlines()[0] if row.text.strip() else ""
+                if text and text not in processed_names:
+                    processed_names.add(text)
+                    skipped += 1
+                    new_in_batch += 1
+                    if skipped >= SKIP_FIRST_N:
+                        break
+            if new_in_batch == 0:
+                skip_empty += 1
+                if skip_empty > 5:
+                    print(f"  Warning: only found {skipped} grants to skip (expected {SKIP_FIRST_N}).")
+                    break
+                if rows:
+                    scroll_element_into_view(driver, rows[-1], block="end")
+                scroll_to_bottom(driver)
+            else:
+                skip_empty = 0
+                if skipped < SKIP_FIRST_N and rows:
+                    scroll_element_into_view(driver, rows[-1], block="end")
+                    scroll_to_bottom(driver)
+        print(f"  Skipped {skipped} grants. Resuming at sheet row {current_sheet_row}.")
+
+    # ── 5. Iterate over remaining grants ─────────────────────────────────────
     total_processed   = 0
-    processed_names   = set()   # tracks names already handled (handles virtual scroll too)
     no_new_rows_count = 0       # consecutive scrolls that produced nothing new
     MAX_EMPTY_SCROLLS = 10      # give up only after 10 fruitless scroll attempts
 
