@@ -107,28 +107,41 @@ def get_grant_rows(driver):
     return driver.find_elements(By.CSS_SELECTOR, ".name-and-owner-column")
 
 
-def scroll_grants_list(driver, amount: int = 600):
-    """Scroll the Instrumentl grants list container to reveal more rows."""
+def scroll_element_into_view(driver, element, block: str = "center"):
+    """Scroll an element into the viewport."""
+    driver.execute_script(
+        f"arguments[0].scrollIntoView({{block:'{block}', inline:'nearest'}});", element
+    )
+    time.sleep(0.5)
+
+
+def scroll_to_bottom(driver):
+    """
+    Scroll the grants list container to its absolute bottom.
+    Instrumentl's infinite-scroll observer fires when the last row
+    enters the viewport — scrolling to scrollHeight guarantees that.
+    Tries #0-scrollable first, then the tallest scrollable div, then window.
+    """
     driver.execute_script("""
-        // Instrumentl uses #0-scrollable as the virtual list container
         var el = document.getElementById('0-scrollable');
-        if (el) {
-            el.scrollTop += arguments[0];
-        } else {
-            // Fallback: scroll any large scrollable div or the window
+        if (!el) {
+            // pick the tallest scrollable div (most likely the list container)
             var divs = Array.from(document.querySelectorAll('div'))
-                            .filter(d => d.scrollHeight > d.clientHeight + 200);
-            if (divs.length) divs[divs.length - 1].scrollTop += arguments[0];
-            else window.scrollBy(0, arguments[0]);
+                            .filter(function(d) {
+                                return d.scrollHeight > d.clientHeight + 100;
+                            })
+                            .sort(function(a, b) {
+                                return b.scrollHeight - a.scrollHeight;
+                            });
+            el = divs[0] || null;
         }
-    """, amount)
-    time.sleep(2)   # let Ember render the new rows
-
-
-def scroll_element_into_view(driver, element):
-    """Scroll a grant row into the viewport before clicking."""
-    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", element)
-    time.sleep(0.4)
+        if (el) {
+            el.scrollTop = el.scrollHeight;
+        } else {
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    """)
+    time.sleep(3)   # give Ember time to render the next batch
 
 
 def open_grant_and_get_url(driver, grant_row) -> str | None:
@@ -205,58 +218,51 @@ def main():
 
     # ── 4. Iterate over grants ───────────────────────────────────────────────
     current_sheet_row = SHEET_START_ROW
-    total_processed   = 0          # absolute count across all scrolls
-    processed_names   = set()      # guard against re-processing (virtual scroll)
-    no_new_rows_count = 0          # consecutive scroll attempts with no new rows
+    total_processed   = 0
+    processed_names   = set()   # tracks names already handled (handles virtual scroll too)
+    no_new_rows_count = 0       # consecutive scrolls that produced nothing new
+    MAX_EMPTY_SCROLLS = 10      # give up only after 10 fruitless scroll attempts
 
     while True:
         grant_rows = get_grant_rows(driver)
 
-        # Find the next unprocessed row in the current DOM snapshot
-        next_row = None
+        # ── Find the first unprocessed row currently in the DOM ──────────────
+        next_row      = None
         next_row_text = None
         for row in grant_rows:
             text = row.text.strip().splitlines()[0] if row.text.strip() else ""
             if text and text not in processed_names:
-                next_row = row
+                next_row      = row
                 next_row_text = text
                 break
 
+        # ── Nothing new visible yet → scroll to bottom to trigger next batch ─
         if next_row is None:
-            # No unprocessed rows visible — try scrolling to load more
-            prev_count = len(grant_rows)
-            print(f"\n  ↓ Scrolling to load more grants (processed {total_processed} so far) …")
-            scroll_grants_list(driver)
+            no_new_rows_count += 1
+            if no_new_rows_count > MAX_EMPTY_SCROLLS:
+                print(f"\nNo new grants after {MAX_EMPTY_SCROLLS} scroll attempts. All done.")
+                break
 
-            new_rows = get_grant_rows(driver)
+            print(
+                f"\n  ↓ Scroll attempt {no_new_rows_count}/{MAX_EMPTY_SCROLLS} "
+                f"(processed {total_processed} so far) …"
+            )
 
-            # Check for truly new (unseen) rows
-            new_unseen = [
-                r for r in new_rows
-                if (r.text.strip().splitlines()[0] if r.text.strip() else "") not in processed_names
-                and (r.text.strip().splitlines()[0] if r.text.strip() else "") != ""
-            ]
+            # Scroll the last visible row into view first (fires the intersection
+            # observer that Instrumentl uses), then go to absolute bottom.
+            if grant_rows:
+                scroll_element_into_view(driver, grant_rows[-1], block="end")
+            scroll_to_bottom(driver)   # wait=3 s baked in
+            continue
 
-            if not new_unseen:
-                no_new_rows_count += 1
-                if no_new_rows_count >= 3:
-                    print(f"\nNo new grants after {no_new_rows_count} scroll attempts. All done.")
-                    break
-                print(f"  No new rows yet (attempt {no_new_rows_count}/3), scrolling more …")
-                scroll_grants_list(driver, amount=1000)
-                continue
-            else:
-                no_new_rows_count = 0
-                continue   # loop back to pick up the new rows
-
-        # ── Process the grant ────────────────────────────────────────────────
-        total_processed += 1
+        # ── We have a new row — reset the empty-scroll counter ───────────────
+        no_new_rows_count = 0
+        total_processed  += 1
         processed_names.add(next_row_text)
         print(f"\n[{total_processed}] {next_row_text}")
 
-        # Scroll it into view so Ember doesn't recycle it before the click
+        # Bring the row to the centre of the viewport before clicking
         scroll_element_into_view(driver, next_row)
-
         website_url = open_grant_and_get_url(driver, next_row)
 
         if website_url:
@@ -273,13 +279,16 @@ def main():
 
             current_sheet_row += 1
 
-            # ── Switch back to Instrumentl ───────────────────────────────────
+            # ── Back to Instrumentl ──────────────────────────────────────────
             driver.switch_to.window(instrumentl_handle)
             time.sleep(1)
 
-        # Close modal; scroll slightly so the next row is visible
+        # Close the modal, then scroll the last visible row into view so the
+        # intersection observer fires and loads the next batch when needed.
         close_grant_modal(driver)
-        scroll_grants_list(driver, amount=200)   # gentle nudge to keep list moving
+        grant_rows = get_grant_rows(driver)
+        if grant_rows:
+            scroll_element_into_view(driver, grant_rows[-1], block="end")
 
     print(f"\nAll done! {total_processed} grants processed. Check your Google Sheet.")
     input("Press Enter to close the browser …")
