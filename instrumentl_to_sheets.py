@@ -246,6 +246,39 @@ def open_grant_and_get_url(driver, grant_row) -> str | None:
         return None
 
 
+def save_grant(driver):
+    """
+    Click the Save button on the open grant modal.
+    Uses the same selector priority as the original bookmarklet:
+      1. .save-button-container > .btn  (most specific)
+      2. Any visible button whose text is exactly "save"
+      3. [aria-label="Save"]
+    Logs a warning but does NOT raise if the button isn't found.
+    """
+    # Try the specific container selector first
+    for by, sel in [
+        (By.CSS_SELECTOR, ".save-button-container > .btn"),
+        (By.CSS_SELECTOR, "[aria-label='Save'], [aria-label='save']"),
+        (By.XPATH, "//button[normalize-space(translate(text(),'SAVE','save'))='save']"),
+    ]:
+        try:
+            btn = wait_for(driver, timeout=5).until(
+                EC.element_to_be_clickable((by, sel))
+            )
+            driver.execute_script(
+                "arguments[0].scrollIntoView({behavior:'smooth',block:'center'});", btn
+            )
+            time.sleep(0.4)
+            btn.click()
+            time.sleep(1.0)   # brief pause after saving
+            print("  ✓ Grant saved.")
+            return
+        except TimeoutException:
+            continue
+
+    print("  ⚠ Save button not found — grant not saved.")
+
+
 def close_grant_modal(driver):
     """Close the grant detail modal."""
     try:
@@ -362,6 +395,9 @@ def main():
 
         scroll_element_into_view(driver, next_row)
         website_url = open_grant_and_get_url(driver, next_row)
+
+        # Save the grant on Instrumentl (mirrors the bookmarklet behaviour)
+        save_grant(driver)
 
         if website_url:
             print(f"  URL: {website_url}  → row {sheet_row}")
