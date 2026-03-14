@@ -25,13 +25,13 @@ SPREADSHEET_URL = (
 )
 INSTRUMENTL_URL = "https://www.instrumentl.com/projects#/all-projects"
 
-SHEET_START_ROW = 2   # first row to write URLs into (1-indexed)
-SHEET_COLUMN    = "B" # column to paste URLs
+SHEET_START_ROW = 101  # next empty row in the sheet
+SHEET_COLUMN    = "B"  # column to paste URLs
 
 # ── Resume support ────────────────────────────────────────────────────────────
-# Set SKIP_FIRST_N > 0 to fast-scroll past grants already in the sheet.
-# The script will mark the first N grants as "already processed" without
-# opening them, then start writing at SHEET_START_ROW + SKIP_FIRST_N.
+# SKIP_FIRST_N: how many grants are already in the sheet.
+# The script fast-scrolls past them without opening modals, then writes
+# starting at SHEET_START_ROW.
 SKIP_FIRST_N = 50   # 50 grants already collected; resume from grant 51
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -225,7 +225,7 @@ def main():
 
     # ── 4. Fast-skip already-processed grants ────────────────────────────────
     processed_names   = set()
-    current_sheet_row = SHEET_START_ROW + SKIP_FIRST_N
+    current_sheet_row = SHEET_START_ROW
 
     if SKIP_FIRST_N > 0:
         print(f"Skipping first {SKIP_FIRST_N} grants (already in sheet) …")
