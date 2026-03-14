@@ -419,8 +419,7 @@ def main():
     # ── 5. Iterate over all remaining grants ─────────────────────────────────
     total_processed   = 0
     no_new_rows_count = 0
-    MAX_EMPTY_SCROLLS = 30          # more headroom for slow/virtual lists
-    last_scroll_top   = -1
+    MAX_EMPTY_SCROLLS = 40
 
     while True:
         grant_rows = get_grant_rows(driver)
@@ -445,21 +444,18 @@ def main():
                 f"\n  ↓ Scroll attempt {no_new_rows_count}/{MAX_EMPTY_SCROLLS} "
                 f"(processed {total_processed} so far) …"
             )
+            # Every 3rd attempt: scroll UP first to reset the observer, then back down
+            if no_new_rows_count % 3 == 0:
+                driver.execute_script(f"""
+                    var el = {_find_scroll_container(driver)};
+                    if (el) el.scrollTop = 0;
+                """)
+                time.sleep(1)
             if grant_rows:
                 scroll_element_into_view(driver, grant_rows[-1], block="end")
             scroll_to_bottom(driver)
-            new_scroll_top = get_scroll_top(driver)
-            if new_scroll_top == last_scroll_top:
-                # Already at the bottom and nothing new — we're genuinely done
-                print("  Scroll position unchanged — reached end of list.")
-                break
-            last_scroll_top = new_scroll_top
+            time.sleep(3)   # extra wait for Ember to render
             continue
-
-        # Process the grant
-        no_new_rows_count = 0
-        last_scroll_top   = -1   # reset so position check works after next scroll
-        total_processed  += 1
         processed_names.add(next_row_text)
         sheet_row = SHEET_START_ROW + SKIP_FIRST_N + total_processed - 1
         print(f"\n[{total_processed}] {next_row_text}")
