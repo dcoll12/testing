@@ -65,23 +65,44 @@ def sheets_go_to_start(driver, cell_address: str):
     """
     Navigate to the starting cell exactly once using the Name Box.
     After this, every sheets_type_url() call advances one row via Enter.
-    """
-    # Escape out of any cell-edit mode first
-    ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-    time.sleep(0.3)
 
-    # Find the Name Box — try several selectors for robustness
+    The Name Box in Google Sheets is a <div> (not <input>), so we search
+    by class/aria-label without restricting to input elements.
+    """
+    # Wait until the spreadsheet grid is actually rendered before proceeding
+    grid_selectors = [
+        ".waffle-name-box", ".cell-input",
+        "canvas#waffle-grid-container", ".grid-container",
+    ]
+    for sel in grid_selectors:
+        try:
+            wait_for(driver, timeout=30).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, sel))
+            )
+            print(f"  Sheet ready (found '{sel}')")
+            break
+        except TimeoutException:
+            continue
+
+    # Escape out of any cell-edit mode
+    ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+    time.sleep(0.5)
+
+    # Find the Name Box — it is a <div>, NOT an <input>
     name_box = None
-    for selector, by in [
-        ("input.cell-input",        By.CSS_SELECTOR),
-        ("[aria-label='Name Box']", By.CSS_SELECTOR),
-        ("//input[@aria-label='Name Box']", By.XPATH),
-        ("//input[contains(@class,'cell-input')]", By.XPATH),
+    for by, selector in [
+        (By.CSS_SELECTOR, ".waffle-name-box"),
+        (By.CSS_SELECTOR, ".cell-input"),
+        (By.CSS_SELECTOR, "[aria-label='Name Box']"),
+        (By.XPATH,        "//*[@aria-label='Name Box']"),
+        (By.XPATH,        "//*[contains(@class,'waffle-name-box')]"),
+        (By.XPATH,        "//*[contains(@class,'cell-input')]"),
     ]:
         try:
-            name_box = wait_for(driver, timeout=5).until(
+            name_box = wait_for(driver, timeout=8).until(
                 EC.element_to_be_clickable((by, selector))
             )
+            print(f"  Name Box found via: {selector}")
             break
         except TimeoutException:
             continue
@@ -90,11 +111,11 @@ def sheets_go_to_start(driver, cell_address: str):
         raise RuntimeError("Could not find Google Sheets Name Box — is the sheet loaded?")
 
     name_box.click()
-    time.sleep(0.3)
+    time.sleep(0.4)
     name_box.send_keys(Keys.CONTROL + "a")
     name_box.send_keys(cell_address)
     name_box.send_keys(Keys.RETURN)
-    time.sleep(0.8)   # wait for Sheets to jump to the cell
+    time.sleep(0.8)
 
 
 def sheets_type_url(driver, url: str):
@@ -217,7 +238,7 @@ def main():
     print("Opening Google Sheets …")
     driver.get(SPREADSHEET_URL)
     sheets_handle = driver.current_window_handle
-    time.sleep(SHORT_WAIT + 1)
+    time.sleep(SHORT_WAIT + 3)   # give Sheets extra time to paint
 
     # Navigate to the starting cell once — cursor will advance on its own
     start_cell = f"{SHEET_COLUMN}{SHEET_START_ROW + SKIP_FIRST_N}"
