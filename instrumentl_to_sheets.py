@@ -107,6 +107,43 @@ def get_grant_rows(driver):
     return driver.find_elements(By.CSS_SELECTOR, ".name-and-owner-column")
 
 
+def scroll_element_into_view(driver, element, block: str = "center"):
+    """Scroll an element into the viewport."""
+    driver.execute_script(
+        f"arguments[0].scrollIntoView({{block:'{block}', inline:'nearest'}});", element
+    )
+    time.sleep(0.5)
+
+
+def scroll_to_bottom(driver):
+    """
+    Scroll the grants list container to its absolute bottom.
+    Instrumentl's infinite-scroll observer fires when the last row
+    enters the viewport — scrolling to scrollHeight guarantees that.
+    Tries #0-scrollable first, then the tallest scrollable div, then window.
+    """
+    driver.execute_script("""
+        var el = document.getElementById('0-scrollable');
+        if (!el) {
+            // pick the tallest scrollable div (most likely the list container)
+            var divs = Array.from(document.querySelectorAll('div'))
+                            .filter(function(d) {
+                                return d.scrollHeight > d.clientHeight + 100;
+                            })
+                            .sort(function(a, b) {
+                                return b.scrollHeight - a.scrollHeight;
+                            });
+            el = divs[0] || null;
+        }
+        if (el) {
+            el.scrollTop = el.scrollHeight;
+        } else {
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    """)
+    time.sleep(3)   # give Ember time to render the next batch
+
+
 def open_grant_and_get_url(driver, grant_row) -> str | None:
     """
     Click a grant row, navigate to Funding Opportunity tab,
@@ -181,21 +218,52 @@ def main():
 
     # ── 4. Iterate over grants ───────────────────────────────────────────────
     current_sheet_row = SHEET_START_ROW
-    grant_index = 0
+    total_processed   = 0
+    processed_names   = set()   # tracks names already handled (handles virtual scroll too)
+    no_new_rows_count = 0       # consecutive scrolls that produced nothing new
+    MAX_EMPTY_SCROLLS = 10      # give up only after 10 fruitless scroll attempts
 
     while True:
         grant_rows = get_grant_rows(driver)
 
-        if grant_index >= len(grant_rows):
-            print(f"\nProcessed all {grant_index} visible grants. Done.")
-            break
+        # ── Find the first unprocessed row currently in the DOM ──────────────
+        next_row      = None
+        next_row_text = None
+        for row in grant_rows:
+            text = row.text.strip().splitlines()[0] if row.text.strip() else ""
+            if text and text not in processed_names:
+                next_row      = row
+                next_row_text = text
+                break
 
-        grant_row = grant_rows[grant_index]
-        grant_text = grant_row.text.strip().splitlines()[0] if grant_row.text else f"Grant #{grant_index+1}"
-        print(f"\n[{grant_index+1}] {grant_text}")
+        # ── Nothing new visible yet → scroll to bottom to trigger next batch ─
+        if next_row is None:
+            no_new_rows_count += 1
+            if no_new_rows_count > MAX_EMPTY_SCROLLS:
+                print(f"\nNo new grants after {MAX_EMPTY_SCROLLS} scroll attempts. All done.")
+                break
 
-        # Get website URL from grant detail
-        website_url = open_grant_and_get_url(driver, grant_row)
+            print(
+                f"\n  ↓ Scroll attempt {no_new_rows_count}/{MAX_EMPTY_SCROLLS} "
+                f"(processed {total_processed} so far) …"
+            )
+
+            # Scroll the last visible row into view first (fires the intersection
+            # observer that Instrumentl uses), then go to absolute bottom.
+            if grant_rows:
+                scroll_element_into_view(driver, grant_rows[-1], block="end")
+            scroll_to_bottom(driver)   # wait=3 s baked in
+            continue
+
+        # ── We have a new row — reset the empty-scroll counter ───────────────
+        no_new_rows_count = 0
+        total_processed  += 1
+        processed_names.add(next_row_text)
+        print(f"\n[{total_processed}] {next_row_text}")
+
+        # Bring the row to the centre of the viewport before clicking
+        scroll_element_into_view(driver, next_row)
+        website_url = open_grant_and_get_url(driver, next_row)
 
         if website_url:
             print(f"  URL: {website_url}")
@@ -211,16 +279,18 @@ def main():
 
             current_sheet_row += 1
 
-            # ── Switch back to Instrumentl ───────────────────────────────────
+            # ── Back to Instrumentl ──────────────────────────────────────────
             driver.switch_to.window(instrumentl_handle)
             time.sleep(1)
 
-        # Close modal and re-fetch rows (DOM may have re-rendered)
+        # Close the modal, then scroll the last visible row into view so the
+        # intersection observer fires and loads the next batch when needed.
         close_grant_modal(driver)
+        grant_rows = get_grant_rows(driver)
+        if grant_rows:
+            scroll_element_into_view(driver, grant_rows[-1], block="end")
 
-        grant_index += 1
-
-    print("\nAll done! Check your Google Sheet.")
+    print(f"\nAll done! {total_processed} grants processed. Check your Google Sheet.")
     input("Press Enter to close the browser …")
     driver.quit()
 
