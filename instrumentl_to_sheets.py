@@ -107,6 +107,30 @@ def get_grant_rows(driver):
     return driver.find_elements(By.CSS_SELECTOR, ".name-and-owner-column")
 
 
+def scroll_grants_list(driver, amount: int = 600):
+    """Scroll the Instrumentl grants list container to reveal more rows."""
+    driver.execute_script("""
+        // Instrumentl uses #0-scrollable as the virtual list container
+        var el = document.getElementById('0-scrollable');
+        if (el) {
+            el.scrollTop += arguments[0];
+        } else {
+            // Fallback: scroll any large scrollable div or the window
+            var divs = Array.from(document.querySelectorAll('div'))
+                            .filter(d => d.scrollHeight > d.clientHeight + 200);
+            if (divs.length) divs[divs.length - 1].scrollTop += arguments[0];
+            else window.scrollBy(0, arguments[0]);
+        }
+    """, amount)
+    time.sleep(2)   # let Ember render the new rows
+
+
+def scroll_element_into_view(driver, element):
+    """Scroll a grant row into the viewport before clicking."""
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", element)
+    time.sleep(0.4)
+
+
 def open_grant_and_get_url(driver, grant_row) -> str | None:
     """
     Click a grant row, navigate to Funding Opportunity tab,
@@ -181,21 +205,59 @@ def main():
 
     # ── 4. Iterate over grants ───────────────────────────────────────────────
     current_sheet_row = SHEET_START_ROW
-    grant_index = 0
+    total_processed   = 0          # absolute count across all scrolls
+    processed_names   = set()      # guard against re-processing (virtual scroll)
+    no_new_rows_count = 0          # consecutive scroll attempts with no new rows
 
     while True:
         grant_rows = get_grant_rows(driver)
 
-        if grant_index >= len(grant_rows):
-            print(f"\nProcessed all {grant_index} visible grants. Done.")
-            break
+        # Find the next unprocessed row in the current DOM snapshot
+        next_row = None
+        next_row_text = None
+        for row in grant_rows:
+            text = row.text.strip().splitlines()[0] if row.text.strip() else ""
+            if text and text not in processed_names:
+                next_row = row
+                next_row_text = text
+                break
 
-        grant_row = grant_rows[grant_index]
-        grant_text = grant_row.text.strip().splitlines()[0] if grant_row.text else f"Grant #{grant_index+1}"
-        print(f"\n[{grant_index+1}] {grant_text}")
+        if next_row is None:
+            # No unprocessed rows visible — try scrolling to load more
+            prev_count = len(grant_rows)
+            print(f"\n  ↓ Scrolling to load more grants (processed {total_processed} so far) …")
+            scroll_grants_list(driver)
 
-        # Get website URL from grant detail
-        website_url = open_grant_and_get_url(driver, grant_row)
+            new_rows = get_grant_rows(driver)
+
+            # Check for truly new (unseen) rows
+            new_unseen = [
+                r for r in new_rows
+                if (r.text.strip().splitlines()[0] if r.text.strip() else "") not in processed_names
+                and (r.text.strip().splitlines()[0] if r.text.strip() else "") != ""
+            ]
+
+            if not new_unseen:
+                no_new_rows_count += 1
+                if no_new_rows_count >= 3:
+                    print(f"\nNo new grants after {no_new_rows_count} scroll attempts. All done.")
+                    break
+                print(f"  No new rows yet (attempt {no_new_rows_count}/3), scrolling more …")
+                scroll_grants_list(driver, amount=1000)
+                continue
+            else:
+                no_new_rows_count = 0
+                continue   # loop back to pick up the new rows
+
+        # ── Process the grant ────────────────────────────────────────────────
+        total_processed += 1
+        processed_names.add(next_row_text)
+        print(f"\n[{total_processed}] {next_row_text}")
+
+        # Scroll it into view so Ember doesn't recycle it before the click
+        scroll_element_into_view(driver, next_row)
+
+        website_url = open_grant_and_get_url(driver, next_row)
 
         if website_url:
             print(f"  URL: {website_url}")
@@ -215,12 +277,11 @@ def main():
             driver.switch_to.window(instrumentl_handle)
             time.sleep(1)
 
-        # Close modal and re-fetch rows (DOM may have re-rendered)
+        # Close modal; scroll slightly so the next row is visible
         close_grant_modal(driver)
+        scroll_grants_list(driver, amount=200)   # gentle nudge to keep list moving
 
-        grant_index += 1
-
-    print("\nAll done! Check your Google Sheet.")
+    print(f"\nAll done! {total_processed} grants processed. Check your Google Sheet.")
     input("Press Enter to close the browser …")
     driver.quit()
 
