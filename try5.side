@@ -1,0 +1,117 @@
+{
+  "id": "533ba0bb-a661-40b5-ac45-db1d36ec52ac",
+  "version": "2.0",
+  "name": "try5",
+  "url": "https://www.instrumentl.com/projects",
+  "tests": [{
+    "id": "0f81730e-921f-4646-a5c6-fad37bc7b292",
+    "name": "Untitled",
+    "commands": [{
+      "id": "9b31a279-8b4c-476b-aa2a-a42d3cb8d27d",
+      "comment": "",
+      "command": "open",
+      "target": "https://www.instrumentl.com/projects#/all-projects",
+      "targets": [],
+      "value": ""
+    }, {
+      "id": "33f1dc22-2d6a-4214-aedf-721f98dab82e",
+      "comment": "",
+      "command": "setWindowSize",
+      "target": "870x764",
+      "targets": [],
+      "value": ""
+    }, {
+      "id": "09071318-7c96-4b4c-985e-af80a11eb58c",
+      "comment": "",
+      "command": "click",
+      "target": "css=.\\_trigger_163dkf > .table-sort-item-label",
+      "targets": [
+        ["css=.\\_trigger_163dkf > .table-sort-item-label", "css:finder"],
+        ["xpath=//div[@id='ember63']/a/span", "xpath:idRelative"],
+        ["xpath=//div[4]/div[2]/div/div/div/div[2]/div/div/a/span", "xpath:position"],
+        ["xpath=//span[contains(.,'NAME')]", "xpath:innerText"]
+      ],
+      "value": ""
+    }, {
+      "id": "16a12f4e-baed-41e6-a546-8e745636bb5e",
+      "comment": "",
+      "command": "click",
+      "target": "css=.\\_option_163dkf:nth-child(1) > p",
+      "targets": [
+        ["css=.\\_option_163dkf:nth-child(1) > p", "css:finder"],
+        ["xpath=//div[@id='ember63']/div/div/div/div/p", "xpath:idRelative"],
+        ["xpath=//div/div[2]/div/div/div/div/div/div/p", "xpath:position"],
+        ["xpath=//p[contains(.,'Grant Name')]", "xpath:innerText"]
+      ],
+      "value": ""
+    }, {
+      "id": "89d8045a-3fdc-4fe6-b616-c2a06502aebe",
+      "comment": "",
+      "command": "click",
+      "target": "css=#ember254 > .name-and-owner-column",
+      "targets": [
+        ["css=#ember254 > .name-and-owner-column", "css:finder"],
+        ["xpath=//div[@id='ember254']/div", "xpath:idRelative"],
+        ["xpath=//div[4]/div[2]/div[2]/div/div/div", "xpath:position"]
+      ],
+      "value": ""
+    }, {
+      "id": "fffcbdc0-ddd2-485b-9b83-735c788944db",
+      "comment": "",
+      "command": "runScript",
+      "target": "window.scrollTo(0,179.1999969482422)",
+      "targets": [],
+      "value": ""
+    }, {
+      "id": "0d0e99e3-bb0d-4b5f-b49a-850b00af0d46",
+      "comment": "",
+      "command": "click",
+      "target": "linkText=Funding Opportunity",
+      "targets": [
+        ["linkText=Funding Opportunity", "linkText"],
+        ["css=.opportunity-tabs-nav > li:nth-child(1) > a", "css:finder"],
+        ["xpath=//a[contains(text(),'Funding Opportunity')]", "xpath:link"],
+        ["xpath=//div[@id='ember529']/div/div/div/div[2]/div[3]/div/div[2]/div/ul/li/a", "xpath:idRelative"],
+        ["xpath=(//a[contains(@href, '#')])[82]", "xpath:href"],
+        ["xpath=//div[3]/div/div[2]/div/ul/li/a", "xpath:position"],
+        ["xpath=//a[contains(.,'Funding Opportunity')]", "xpath:innerText"]
+      ],
+      "value": ""
+    }, {
+      "id": "b4a34356-8532-472c-b0e8-5dd05dc75ae6",
+      "comment": "",
+      "command": "click",
+      "target": "linkText=View website",
+      "targets": [
+        ["linkText=View website", "linkText"],
+        ["css=.grant-website-url", "css:finder"],
+        ["xpath=//a[contains(text(),'View website')]", "xpath:link"],
+        ["xpath=//div[@id='ember529']/div/div/div/div[2]/div[3]/div/div[2]/div[2]/div/div/div/div/div/div/a", "xpath:idRelative"],
+        ["xpath=//a[contains(@href, 'https://www.100ximpact.org/how-to-apply')]", "xpath:href"],
+        ["xpath=//div[2]/div[2]/div/div/div/div/div/div/a", "xpath:position"],
+        ["xpath=//a[contains(.,'View website')]", "xpath:innerText"]
+      ],
+      "value": "",
+      "opensWindow": true,
+      "windowHandleName": "win2085",
+      "windowTimeout": 2000
+    }, {
+      "id": "21265fe3-0912-4c66-83d4-5fa5b3ad52a5",
+      "comment": "",
+      "command": "selectWindow",
+      "target": "handle=${win2085}",
+      "targets": [],
+      "value": ""
+    }]
+  }],
+  "suites": [{
+    "id": "5ac05bcb-fba1-4900-84ff-88ed9eacb984",
+    "name": "Default Suite",
+    "persistSession": false,
+    "parallel": false,
+    "timeout": 300,
+    "tests": ["0f81730e-921f-4646-a5c6-fad37bc7b292"]
+  }],
+  "urls": [],
+  "plugins": []
+}

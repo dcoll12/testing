@@ -1,0 +1,117 @@
+{
+  "id": "57628d3e-1da7-4927-8703-3da7cacf372e",
+  "version": "2.0",
+  "name": "Try4",
+  "url": "https://docs.google.com",
+  "tests": [{
+    "id": "2dcacf2c-0080-4043-a4a6-90342b2554d7",
+    "name": "Untitled",
+    "commands": [{
+      "id": "d5ae91f3-5308-486f-a970-ac510d7b131d",
+      "comment": "",
+      "command": "open",
+      "target": "/spreadsheets/d/1hc_Ehb2evMR5h5kbQKfrWmiz53C-DO4Aa410u2yxa0E/edit?gid=0",
+      "targets": [],
+      "value": ""
+    }, {
+      "id": "301b37d1-c070-4075-895b-5154368dae96",
+      "comment": "",
+      "command": "setWindowSize",
+      "target": "870x764",
+      "targets": [],
+      "value": ""
+    }, {
+      "id": "58d5e9e7-0b8a-48d4-a86e-8af153739ab7",
+      "comment": "",
+      "command": "click",
+      "target": "css=.grid4-inner-container:nth-child(2)",
+      "targets": [
+        ["css=.grid4-inner-container:nth-child(2)", "css:finder"],
+        ["xpath=//div[@id='0-scrollable']/div[2]", "xpath:idRelative"],
+        ["xpath=//div[5]/div[2]/div/div[2]", "xpath:position"]
+      ],
+      "value": ""
+    }, {
+      "id": "004fbd27-2a58-4f87-8d55-4628467bdcf6",
+      "comment": "",
+      "command": "click",
+      "target": "css=.grid4-inner-container:nth-child(2)",
+      "targets": [
+        ["css=.grid4-inner-container:nth-child(2)", "css:finder"],
+        ["xpath=//div[@id='0-scrollable']/div[2]", "xpath:idRelative"],
+        ["xpath=//div[5]/div[2]/div/div[2]", "xpath:position"]
+      ],
+      "value": ""
+    }, {
+      "id": "96797c69-83bc-4629-92e3-521b93261e7d",
+      "comment": "",
+      "command": "click",
+      "target": "css=#f8vxgd\\3A 1bl .goog-menuitem-label",
+      "targets": [
+        ["css=#f8vxgd\\3A 1bl .goog-menuitem-label", "css:finder"],
+        ["xpath=//div[@id='f8vxgd:1bl']/div/span", "xpath:idRelative"],
+        ["xpath=//div[61]/div[3]/div/span", "xpath:position"],
+        ["xpath=//span[contains(.,'Paste')]", "xpath:innerText"]
+      ],
+      "value": ""
+    }, {
+      "id": "26186fbe-ff25-48d5-8d7c-0279145f0b02",
+      "comment": "",
+      "command": "click",
+      "target": "css=.javascriptMaterialdesignGm3WizButtonText-button",
+      "targets": [
+        ["css=.javascriptMaterialdesignGm3WizButtonText-button", "css:finder"],
+        ["xpath=//div[2]/div/div[2]/div/button", "xpath:position"],
+        ["xpath=//button[contains(.,'OK')]", "xpath:innerText"]
+      ],
+      "value": ""
+    }, {
+      "id": "04e0e843-a425-441a-9619-eef94ee72675",
+      "comment": "",
+      "command": "click",
+      "target": "id=docs-branding-container",
+      "targets": [
+        ["id=docs-branding-container", "id"],
+        ["css=#docs-branding-container", "css:finder"],
+        ["xpath=//div[@id='docs-branding-container']", "xpath:attributes"],
+        ["xpath=//div[@id='docs-header']/div", "xpath:idRelative"],
+        ["xpath=//div[4]/div[2]/div/div", "xpath:position"]
+      ],
+      "value": ""
+    }, {
+      "id": "d47e27a1-29a2-4d04-8183-53a6b87d4a65",
+      "comment": "",
+      "command": "click",
+      "target": "id=docs-file-menu",
+      "targets": [
+        ["id=docs-file-menu", "id"],
+        ["css=#docs-file-menu", "css:finder"],
+        ["xpath=//div[@id='docs-file-menu']", "xpath:attributes"],
+        ["xpath=//div[@id='docs-menubar']/div", "xpath:idRelative"],
+        ["xpath=//body/div[2]/div[5]/div/div/div", "xpath:position"]
+      ],
+      "value": ""
+    }, {
+      "id": "257055a7-d5a2-468a-8b76-768ff43ee56b",
+      "comment": "",
+      "command": "click",
+      "target": "css=.grid4-inner-container:nth-child(2)",
+      "targets": [
+        ["css=.grid4-inner-container:nth-child(2)", "css:finder"],
+        ["xpath=//div[@id='0-scrollable']/div[2]", "xpath:idRelative"],
+        ["xpath=//div[5]/div[2]/div/div[2]", "xpath:position"]
+      ],
+      "value": ""
+    }]
+  }],
+  "suites": [{
+    "id": "e635969c-0577-4a75-b5d7-0ff342d1ad2e",
+    "name": "Default Suite",
+    "persistSession": false,
+    "parallel": false,
+    "timeout": 300,
+    "tests": ["2dcacf2c-0080-4043-a4a6-90342b2554d7"]
+  }],
+  "urls": ["https://docs.google.com/"],
+  "plugins": []
+}
