@@ -196,12 +196,9 @@ def scroll_element_into_view(driver, element, block: str = "center"):
     time.sleep(0.5)
 
 
-def scroll_to_bottom(driver):
-    """
-    Scroll the grants list to its absolute bottom so Instrumentl's
-    infinite-scroll intersection observer fires and loads the next batch.
-    """
-    driver.execute_script("""
+def _find_scroll_container(driver):
+    """Return JS expression that resolves to the scrollable list container."""
+    return """(function() {
         var el = document.getElementById('0-scrollable');
         if (!el) {
             var divs = Array.from(document.querySelectorAll('div'))
@@ -213,13 +210,37 @@ def scroll_to_bottom(driver):
                             });
             el = divs[0] || null;
         }
-        if (el) {
+        return el;
+    })()"""
+
+
+def scroll_to_bottom(driver):
+    """
+    Scroll the grants list to its absolute bottom so Instrumentl's
+    infinite-scroll intersection observer fires and loads the next batch.
+    Pumps scroll three times so the observer reliably fires even after
+    a modal close that resets the scroll position.
+    """
+    script = f"""
+        var el = {_find_scroll_container(driver)};
+        if (el) {{
             el.scrollTop = el.scrollHeight;
-        } else {
+        }} else {{
             window.scrollTo(0, document.body.scrollHeight);
-        }
-    """)
-    time.sleep(3)   # give Ember time to render the next batch
+        }}
+    """
+    for _ in range(3):
+        driver.execute_script(script)
+        time.sleep(1.5)
+    time.sleep(2)   # give Ember time to render the next batch
+
+
+def get_scroll_top(driver) -> int:
+    """Return the current scrollTop of the grants container (0 if not found)."""
+    return driver.execute_script(f"""
+        var el = {_find_scroll_container(driver)};
+        return el ? el.scrollTop : 0;
+    """) or 0
 
 
 def open_grant_and_get_url(driver, grant_row) -> str | None:
@@ -363,7 +384,8 @@ def main():
     # ── 5. Iterate over all remaining grants ─────────────────────────────────
     total_processed   = 0
     no_new_rows_count = 0
-    MAX_EMPTY_SCROLLS = 10
+    MAX_EMPTY_SCROLLS = 30          # more headroom for slow/virtual lists
+    last_scroll_top   = -1
 
     while True:
         grant_rows = get_grant_rows(driver)
@@ -391,10 +413,17 @@ def main():
             if grant_rows:
                 scroll_element_into_view(driver, grant_rows[-1], block="end")
             scroll_to_bottom(driver)
+            new_scroll_top = get_scroll_top(driver)
+            if new_scroll_top == last_scroll_top:
+                # Already at the bottom and nothing new — we're genuinely done
+                print("  Scroll position unchanged — reached end of list.")
+                break
+            last_scroll_top = new_scroll_top
             continue
 
         # Process the grant
         no_new_rows_count = 0
+        last_scroll_top   = -1   # reset so position check works after next scroll
         total_processed  += 1
         processed_names.add(next_row_text)
         sheet_row = SHEET_START_ROW + SKIP_FIRST_N + total_processed - 1
