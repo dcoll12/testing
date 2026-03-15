@@ -487,9 +487,13 @@ def main():
     # ── 4. Load previously processed grants & merge with sheet contents ──────
     processed_names = load_processed_names()
 
+    # If the sheet is empty, the local cache is stale — wipe it so we start fresh.
+    if sheet_count == 0 and processed_names:
+        print(f"  Sheet is empty but cache has {len(processed_names)} entries — clearing cache for fresh run.")
+        PROGRESS_FILE.write_text("", encoding="utf-8")
+        processed_names = set()
+
     # Add any names found directly in the sheet that aren't in the local cache.
-    # This ensures grants already written to the sheet are never re-processed,
-    # even when processed_grants.txt is missing or was created on another machine.
     new_from_sheet = sheet_names - processed_names
     if new_from_sheet:
         print(f"  {len(new_from_sheet)} sheet entries not in local cache — adding to skip list …")
@@ -498,7 +502,7 @@ def main():
             save_processed_name(name)
 
     # Use the sheet's actual row count as the authoritative resume position.
-    already_done = sheet_count if sheet_count > 0 else len(processed_names)
+    already_done = sheet_count
 
     # Jump the sheet cursor past rows already written in previous runs
     if already_done > 0:
