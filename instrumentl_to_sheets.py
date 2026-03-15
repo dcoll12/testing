@@ -546,6 +546,11 @@ def main():
     while True:
         grant_rows = get_grant_rows(driver)
 
+        # Diagnose what we're seeing each iteration
+        print(f"\n  [debug] {len(grant_rows)} row(s) found with selector '.name-and-owner-column'")
+        for i, r in enumerate(grant_rows[:3]):
+            print(f"    row[{i}] text={repr(r.text.strip()[:80])}")
+
         # Find the first unprocessed row in the current DOM snapshot
         next_row      = None
         next_row_text = None
@@ -555,6 +560,8 @@ def main():
                 next_row      = row
                 next_row_text = text
                 break
+            elif text and text in processed_names:
+                print(f"    skipping (already processed): {text[:60]}")
 
         # Nothing new — scroll to trigger the next batch
         if next_row is None:
