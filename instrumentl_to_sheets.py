@@ -329,23 +329,47 @@ def get_scroll_top(driver) -> int:
     """) or 0
 
 
-def open_grant_and_get_url(driver, grant_row) -> str | None:
+def open_grant_and_get_name_and_url(driver, grant_row) -> tuple[str | None, str | None]:
     """
-    Click a grant row on the saved grants page and return the website URL.
-    No tab navigation needed — the View website link is directly accessible.
+    Click a grant row on the saved grants page.
+    Returns (grant_name, website_url) — either may be None if not found.
     """
     wait = wait_for(driver)
     grant_row.click()
     time.sleep(SHORT_WAIT)
 
+    # Try to get the grant name from the modal
+    name = None
+    for by, sel in [
+        (By.CSS_SELECTOR, ".opportunity-title"),
+        (By.CSS_SELECTOR, ".grant-title"),
+        (By.CSS_SELECTOR, ".modal-title"),
+        (By.CSS_SELECTOR, ".saved-grant-name"),
+        (By.XPATH, "//div[contains(@class,'modal')]//h1"),
+        (By.XPATH, "//div[contains(@class,'modal')]//h2"),
+    ]:
+        try:
+            el = WebDriverWait(driver, 3).until(EC.presence_of_element_located((by, sel)))
+            text = el.text.strip()
+            if text:
+                name = text
+                break
+        except TimeoutException:
+            continue
+    if not name:
+        print("  ⚠ Grant name not found in modal.")
+
+    # Get URL
     try:
         view_website = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, ".grant-website-url"))
         )
-        return view_website.get_attribute("href")
+        url = view_website.get_attribute("href")
     except TimeoutException:
         print("  ✗ 'View website' link not found.")
-        return None
+        url = None
+
+    return name, url
 
 
 def save_grant(driver) -> bool:
@@ -564,13 +588,15 @@ def main():
         print(f"\n[{already_done + total_processed}] {next_row_text}")
 
         scroll_element_into_view(driver, next_row)
-        website_url = open_grant_and_get_url(driver, next_row)
+        modal_name, website_url = open_grant_and_get_name_and_url(driver, next_row)
+        grant_name = modal_name or next_row_text  # fall back to row text if modal name missing
 
         if website_url:
-            print(f"  URL: {website_url}  → row {sheet_row}")
+            print(f"  NAME: {grant_name}")
+            print(f"  URL:  {website_url}  → row {sheet_row}")
             driver.switch_to.window(sheets_handle)
             time.sleep(1)
-            sheets_write_row(driver, next_row_text, website_url)
+            sheets_write_row(driver, grant_name, website_url)
             driver.switch_to.window(instrumentl_handle)
             time.sleep(1)
 
