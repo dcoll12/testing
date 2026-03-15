@@ -270,8 +270,8 @@ def instrumentl_sort_by_grant_name(driver):
 
 
 def get_grant_rows(driver):
-    """Return all visible grant row elements (saved grants page)."""
-    return driver.find_elements(By.CSS_SELECTOR, ".saved-grant-deadline-and-submission-wrap")
+    """Return all visible grant row elements."""
+    return driver.find_elements(By.CSS_SELECTOR, ".name-and-owner-column")
 
 
 def scroll_element_into_view(driver, element, block: str = "center"):
@@ -331,35 +331,31 @@ def get_scroll_top(driver) -> int:
 
 def open_grant_and_get_name_and_url(driver, grant_row) -> tuple[str | None, str | None]:
     """
-    Click a grant row on the saved grants page.
-    Returns (grant_name, website_url) — either may be None if not found.
+    Click a grant row, go to the Funding Opportunity tab, and return (name, url).
+    Name is read from the row element before clicking (most reliable source).
     """
     wait = wait_for(driver)
+
+    # Get name from the row element text before clicking
+    name = grant_row.text.strip().splitlines()[0] if grant_row.text.strip() else None
+
     grant_row.click()
     time.sleep(SHORT_WAIT)
 
-    # Try to get the grant name from the modal
-    name = None
-    for by, sel in [
-        (By.CSS_SELECTOR, ".opportunity-title"),
-        (By.CSS_SELECTOR, ".grant-title"),
-        (By.CSS_SELECTOR, ".modal-title"),
-        (By.CSS_SELECTOR, ".saved-grant-name"),
-        (By.XPATH, "//div[contains(@class,'modal')]//h1"),
-        (By.XPATH, "//div[contains(@class,'modal')]//h2"),
-    ]:
-        try:
-            el = WebDriverWait(driver, 3).until(EC.presence_of_element_located((by, sel)))
-            text = el.text.strip()
-            if text:
-                name = text
-                break
-        except TimeoutException:
-            continue
-    if not name:
-        print("  ⚠ Grant name not found in modal.")
+    # Click the Funding Opportunity tab
+    try:
+        funding_tab = wait.until(
+            EC.element_to_be_clickable(
+                (By.XPATH, "//a[contains(.,'Funding Opportunity')]")
+            )
+        )
+        funding_tab.click()
+        time.sleep(1.5)
+    except TimeoutException:
+        print("  ✗ 'Funding Opportunity' tab not found.")
+        return name, None
 
-    # Get URL
+    # Get URL from the View website link href (no need to open the tab)
     try:
         view_website = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, ".grant-website-url"))
