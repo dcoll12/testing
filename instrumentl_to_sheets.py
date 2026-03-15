@@ -36,7 +36,7 @@ from selenium.common.exceptions import (
 # ── Configuration ────────────────────────────────────────────────────────────
 SPREADSHEET_URL = (
     "https://docs.google.com/spreadsheets/d/"
-    "1ZpJTY-1d2MOFB5TlfDkOwHWWF0roclVS/edit?gid=0"
+    "1hc_Ehb2evMR5h5kbQKfrWmiz53C-DO4Aa410u2yxa0E/edit?gid=729130956#gid=729130956"
 )
 INSTRUMENTL_URL = "https://www.instrumentl.com/projects#/all-projects"
 
@@ -572,9 +572,6 @@ def main():
 
         scroll_element_into_view(driver, next_row)
         website_url = open_grant_and_get_url(driver, next_row)
-
-        # Save the grant on Instrumentl (mirrors the bookmarklet behaviour)
-        save_grant(driver)
 
         if website_url:
             print(f"  URL: {website_url}  → row {sheet_row}")
