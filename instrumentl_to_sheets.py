@@ -32,7 +32,7 @@ from selenium.common.exceptions import (
 # ── Configuration ────────────────────────────────────────────────────────────
 SPREADSHEET_URL = (
     "https://docs.google.com/spreadsheets/d/"
-    "1hc_Ehb2evMR5h5kbQKfrWmiz53C-DO4Aa410u2yxa0E/edit?gid=0"
+    "1YTYMpXIj1DEf70rap2YyyQTw_oet2zs7sSrYX-TF45Q/edit?usp=sharing"
 )
 INSTRUMENTL_URL = "https://www.instrumentl.com/projects#/all-projects"
 
