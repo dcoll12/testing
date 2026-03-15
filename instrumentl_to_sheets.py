@@ -573,9 +573,6 @@ def main():
         scroll_element_into_view(driver, next_row)
         website_url = open_grant_and_get_url(driver, next_row)
 
-        # Save the grant on Instrumentl (mirrors the bookmarklet behaviour)
-        save_grant(driver)
-
         if website_url:
             print(f"  URL: {website_url}  → row {sheet_row}")
             driver.switch_to.window(sheets_handle)
