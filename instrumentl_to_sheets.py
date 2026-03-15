@@ -49,6 +49,10 @@ SHEET_COLUMN    = "A"  # starting column (name goes here, URL goes in the next c
 # opening them, then starts writing at SHEET_START_ROW + SKIP_FIRST_N.
 SKIP_FIRST_N = 0   # starting fresh — process every grant from the top
 
+# When True: only write the URL to Google Sheets if the grant was successfully
+# saved (bookmarked) on Instrumentl first.  Set to False to always write the URL.
+ONLY_WRITE_IF_SAVED = True
+
 # Local file that persists processed grant names across runs.
 # Delete this file to start completely fresh.
 PROGRESS_FILE = pathlib.Path(__file__).parent / "processed_grants.txt"
@@ -360,14 +364,14 @@ def open_grant_and_get_url(driver, grant_row) -> str | None:
         return None
 
 
-def save_grant(driver):
+def save_grant(driver) -> bool:
     """
     Click the Save button on the open grant modal.
     Uses the same selector priority as the original bookmarklet:
       1. .save-button-container > .btn  (most specific)
       2. Any visible button whose text is exactly "save"
       3. [aria-label="Save"]
-    Logs a warning but does NOT raise if the button isn't found.
+    Returns True if the save button was found and clicked, False otherwise.
     """
     # Try the specific container selector first
     for by, sel in [
@@ -386,11 +390,12 @@ def save_grant(driver):
             btn.click()
             time.sleep(1.0)   # brief pause after saving
             print("  ✓ Grant saved.")
-            return
+            return True
         except TimeoutException:
             continue
 
     print("  ⚠ Save button not found — grant not saved.")
+    return False
 
 
 def close_grant_modal(driver):
@@ -574,12 +579,19 @@ def main():
         website_url = open_grant_and_get_url(driver, next_row)
 
         if website_url:
-            print(f"  URL: {website_url}  → row {sheet_row}")
-            driver.switch_to.window(sheets_handle)
-            time.sleep(1)
-            sheets_write_row(driver, next_row_text, website_url)
-            driver.switch_to.window(instrumentl_handle)
-            time.sleep(1)
+            # Optionally require the grant to be saved before writing the URL
+            grant_saved = save_grant(driver)
+            should_write = grant_saved if ONLY_WRITE_IF_SAVED else True
+
+            if should_write:
+                print(f"  URL: {website_url}  → row {sheet_row}")
+                driver.switch_to.window(sheets_handle)
+                time.sleep(1)
+                sheets_write_row(driver, next_row_text, website_url)
+                driver.switch_to.window(instrumentl_handle)
+                time.sleep(1)
+            else:
+                print(f"  Skipping URL write (grant not saved and ONLY_WRITE_IF_SAVED=True).")
 
         # Close modal, then nudge scroll so the list stays positioned
         close_grant_modal(driver)
