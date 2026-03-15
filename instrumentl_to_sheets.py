@@ -270,8 +270,8 @@ def instrumentl_sort_by_grant_name(driver):
 
 
 def get_grant_rows(driver):
-    """Return all visible grant row elements."""
-    return driver.find_elements(By.CSS_SELECTOR, ".name-and-owner-column")
+    """Return all visible grant row elements (saved grants page)."""
+    return driver.find_elements(By.CSS_SELECTOR, ".saved-grant-deadline-and-submission-wrap")
 
 
 def scroll_element_into_view(driver, element, block: str = "center"):
@@ -331,24 +331,12 @@ def get_scroll_top(driver) -> int:
 
 def open_grant_and_get_url(driver, grant_row) -> str | None:
     """
-    Click a grant row, go to the Funding Opportunity tab,
-    and return the website URL (or None if not found).
+    Click a grant row on the saved grants page and return the website URL.
+    No tab navigation needed — the View website link is directly accessible.
     """
     wait = wait_for(driver)
     grant_row.click()
     time.sleep(SHORT_WAIT)
-
-    try:
-        funding_tab = wait.until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//a[contains(.,'Funding Opportunity')]")
-            )
-        )
-        funding_tab.click()
-        time.sleep(1.5)
-    except TimeoutException:
-        print("  ✗ 'Funding Opportunity' tab not found, skipping.")
-        return None
 
     try:
         view_website = wait.until(
@@ -396,17 +384,21 @@ def save_grant(driver) -> bool:
 
 def close_grant_modal(driver):
     """Close the grant detail modal."""
-    try:
-        close_btn = wait_for(driver, timeout=5).until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, ".modal-lg .modal-header span")
+    for sel in [
+        ".in > .modal-dialog > .modal-content > .modal-header > .close > span",
+        ".modal-lg .modal-header span",
+    ]:
+        try:
+            close_btn = wait_for(driver, timeout=5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, sel))
             )
-        )
-        close_btn.click()
-        time.sleep(1)
-    except TimeoutException:
-        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-        time.sleep(1)
+            close_btn.click()
+            time.sleep(1)
+            return
+        except TimeoutException:
+            continue
+    ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+    time.sleep(1)
 
 
 def instrumentl_login(driver):
