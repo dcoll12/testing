@@ -49,10 +49,6 @@ SHEET_COLUMN    = "A"  # starting column (name goes here, URL goes in the next c
 # opening them, then starts writing at SHEET_START_ROW + SKIP_FIRST_N.
 SKIP_FIRST_N = 0   # starting fresh — process every grant from the top
 
-# When True: only write the URL to Google Sheets if the grant was successfully
-# saved (bookmarked) on Instrumentl first.  Set to False to always write the URL.
-ONLY_WRITE_IF_SAVED = True
-
 # Local file that persists processed grant names across runs.
 # Delete this file to start completely fresh.
 PROGRESS_FILE = pathlib.Path(__file__).parent / "processed_grants.txt"
@@ -579,19 +575,12 @@ def main():
         website_url = open_grant_and_get_url(driver, next_row)
 
         if website_url:
-            # Optionally require the grant to be saved before writing the URL
-            grant_saved = save_grant(driver)
-            should_write = grant_saved if ONLY_WRITE_IF_SAVED else True
-
-            if should_write:
-                print(f"  URL: {website_url}  → row {sheet_row}")
-                driver.switch_to.window(sheets_handle)
-                time.sleep(1)
-                sheets_write_row(driver, next_row_text, website_url)
-                driver.switch_to.window(instrumentl_handle)
-                time.sleep(1)
-            else:
-                print(f"  Skipping URL write (grant not saved and ONLY_WRITE_IF_SAVED=True).")
+            print(f"  URL: {website_url}  → row {sheet_row}")
+            driver.switch_to.window(sheets_handle)
+            time.sleep(1)
+            sheets_write_row(driver, next_row_text, website_url)
+            driver.switch_to.window(instrumentl_handle)
+            time.sleep(1)
 
         # Close modal, then nudge scroll so the list stays positioned
         close_grant_modal(driver)
