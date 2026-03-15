@@ -15,9 +15,13 @@ where the cell address (e.g. "B46") was being typed as literal text
 instead of used for navigation.
 """
 
+import csv
+import io
 import os
 import pathlib
+import re
 import time
+import requests
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -68,6 +72,66 @@ def save_processed_name(name: str):
     """Append a single grant name to the progress file."""
     with PROGRESS_FILE.open("a", encoding="utf-8") as f:
         f.write(name + "\n")
+
+
+def read_existing_sheet_names(driver, sheets_handle) -> tuple[set, int]:
+    """
+    Download the Google Sheet as CSV using the active browser session and
+    return (set_of_existing_names_in_col_A, number_of_filled_data_rows).
+
+    This lets the script skip grants that are already in the sheet even when
+    the local processed_grants.txt cache is missing or out of date.
+    Falls back to (empty set, 0) on any error so the script still runs.
+    """
+    driver.switch_to.window(sheets_handle)
+
+    match = re.search(r'/spreadsheets/d/([^/]+)', SPREADSHEET_URL)
+    if not match:
+        print("  Warning: could not parse spreadsheet ID — skipping sheet read.")
+        return set(), 0
+    sheet_id = match.group(1)
+
+    gid_match = re.search(r'gid=(\d+)', SPREADSHEET_URL)
+    gid = gid_match.group(1) if gid_match else '0'
+
+    export_url = (
+        f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+        f"/export?format=csv&gid={gid}"
+    )
+
+    # Copy the browser's current cookies into a requests session so the
+    # export request is authenticated with the same Google account.
+    session = requests.Session()
+    for c in driver.get_cookies():
+        session.cookies.set(c['name'], c['value'])
+    session.headers['User-Agent'] = driver.execute_script('return navigator.userAgent')
+
+    try:
+        resp = session.get(export_url, timeout=20, allow_redirects=True)
+        resp.raise_for_status()
+    except Exception as exc:
+        print(f"  Warning: could not read sheet via export ({exc}) — relying on local cache only.")
+        return set(), 0
+
+    names: set = set()
+    last_filled_row = 0
+    for row_idx, row in enumerate(csv.reader(io.StringIO(resp.text)), start=1):
+        if row_idx < SHEET_START_ROW:
+            continue  # skip header rows
+        if row and row[0].strip():
+            names.add(row[0].strip())
+            last_filled_row = row_idx
+
+    filled_count = (
+        last_filled_row - SHEET_START_ROW + 1
+        if last_filled_row >= SHEET_START_ROW
+        else 0
+    )
+    print(
+        f"  Google Sheet: {len(names)} existing entries "
+        f"(last data row: {last_filled_row or 'none'})"
+    )
+    return names, filled_count
 
 
 def make_driver() -> webdriver.Chrome:
@@ -384,6 +448,10 @@ def main():
     sheets_handle = driver.current_window_handle
     time.sleep(SHORT_WAIT + 3)   # give Sheets extra time to paint
 
+    # Check the sheet for entries already written so we can skip them
+    print("Checking Google Sheet for existing entries …")
+    sheet_names, sheet_count = read_existing_sheet_names(driver, sheets_handle)
+
     # Navigate to the starting cell once — cursor will advance on its own
     start_cell = f"{SHEET_COLUMN}{SHEET_START_ROW + SKIP_FIRST_N}"
     print(f"Navigating to starting cell {start_cell} …")
@@ -403,9 +471,22 @@ def main():
     print("Sorting by Grant Name …")
     instrumentl_sort_by_grant_name(driver)
 
-    # ── 4. Load previously processed grants & set starting cell ─────────────
+    # ── 4. Load previously processed grants & merge with sheet contents ──────
     processed_names = load_processed_names()
-    already_done    = len(processed_names)
+
+    # Add any names found directly in the sheet that aren't in the local cache.
+    # This ensures grants already written to the sheet are never re-processed,
+    # even when processed_grants.txt is missing or was created on another machine.
+    new_from_sheet = sheet_names - processed_names
+    if new_from_sheet:
+        print(f"  {len(new_from_sheet)} sheet entries not in local cache — adding to skip list …")
+        processed_names |= new_from_sheet
+        for name in new_from_sheet:
+            save_processed_name(name)
+
+    # Use the sheet's actual row count as the authoritative resume position.
+    already_done = sheet_count if sheet_count > 0 else len(processed_names)
+
     # Jump the sheet cursor past rows already written in previous runs
     if already_done > 0:
         resume_cell = f"{SHEET_COLUMN}{SHEET_START_ROW + already_done}"
