@@ -16,6 +16,7 @@ instead of used for navigation.
 """
 
 import os
+import pathlib
 import time
 from dotenv import load_dotenv
 from selenium import webdriver
@@ -43,11 +44,30 @@ SHEET_COLUMN    = "A"  # starting column (name goes here, URL goes in the next c
 # The script marks the first N grants as "already processed" without
 # opening them, then starts writing at SHEET_START_ROW + SKIP_FIRST_N.
 SKIP_FIRST_N = 0   # starting fresh — process every grant from the top
+
+# Local file that persists processed grant names across runs.
+# Delete this file to start completely fresh.
+PROGRESS_FILE = pathlib.Path(__file__).parent / "processed_grants.txt"
 # ──────────────────────────────────────────────────────────────────────────
 
 SHORT_WAIT  = 3   # seconds for short pauses
 LONG_WAIT   = 10  # seconds for WebDriverWait timeout
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def load_processed_names() -> set:
+    """Load the set of already-processed grant names from disk."""
+    if not PROGRESS_FILE.exists():
+        return set()
+    names = {line.strip() for line in PROGRESS_FILE.read_text(encoding="utf-8").splitlines() if line.strip()}
+    print(f"  Loaded {len(names)} previously processed grants from {PROGRESS_FILE.name}")
+    return names
+
+
+def save_processed_name(name: str):
+    """Append a single grant name to the progress file."""
+    with PROGRESS_FILE.open("a", encoding="utf-8") as f:
+        f.write(name + "\n")
 
 
 def make_driver() -> webdriver.Chrome:
@@ -383,8 +403,16 @@ def main():
     print("Sorting by Grant Name …")
     instrumentl_sort_by_grant_name(driver)
 
-    # ── 4. Fast-skip already-processed grants ────────────────────────────────
-    processed_names = set()
+    # ── 4. Load previously processed grants & set starting cell ─────────────
+    processed_names = load_processed_names()
+    already_done    = len(processed_names)
+    # Jump the sheet cursor past rows already written in previous runs
+    if already_done > 0:
+        resume_cell = f"{SHEET_COLUMN}{SHEET_START_ROW + already_done}"
+        print(f"  Resuming — navigating sheet to {resume_cell} …")
+        driver.switch_to.window(sheets_handle)
+        sheets_go_to_start(driver, resume_cell)
+        driver.switch_to.window(instrumentl_handle)
 
     if SKIP_FIRST_N > 0:
         print(f"Skipping first {SKIP_FIRST_N} grants (already in sheet) …")
@@ -457,8 +485,9 @@ def main():
             time.sleep(3)   # extra wait for Ember to render
             continue
         processed_names.add(next_row_text)
-        sheet_row = SHEET_START_ROW + SKIP_FIRST_N + total_processed - 1
-        print(f"\n[{total_processed}] {next_row_text}")
+        save_processed_name(next_row_text)
+        sheet_row = SHEET_START_ROW + already_done + total_processed - 1
+        print(f"\n[{already_done + total_processed}] {next_row_text}")
 
         scroll_element_into_view(driver, next_row)
         website_url = open_grant_and_get_url(driver, next_row)
