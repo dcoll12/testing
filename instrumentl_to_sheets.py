@@ -360,14 +360,14 @@ def open_grant_and_get_url(driver, grant_row) -> str | None:
         return None
 
 
-def save_grant(driver):
+def save_grant(driver) -> bool:
     """
     Click the Save button on the open grant modal.
     Uses the same selector priority as the original bookmarklet:
       1. .save-button-container > .btn  (most specific)
       2. Any visible button whose text is exactly "save"
       3. [aria-label="Save"]
-    Logs a warning but does NOT raise if the button isn't found.
+    Returns True if the save button was found and clicked, False otherwise.
     """
     # Try the specific container selector first
     for by, sel in [
@@ -386,11 +386,12 @@ def save_grant(driver):
             btn.click()
             time.sleep(1.0)   # brief pause after saving
             print("  ✓ Grant saved.")
-            return
+            return True
         except TimeoutException:
             continue
 
     print("  ⚠ Save button not found — grant not saved.")
+    return False
 
 
 def close_grant_modal(driver):
